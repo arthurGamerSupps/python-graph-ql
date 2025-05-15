@@ -7,10 +7,10 @@ import argparse
 
 def get_affiliates(max_affiliates=5000):
     """
-    Fetch all affiliates from the GoAffPro API, handling pagination
+    Fetch all affiliates from the GoAffPro API in a single call
     
     Args:
-        max_affiliates: Maximum number of affiliates to fetch (safety limit)
+        max_affiliates: Maximum number of affiliates to fetch (not used since pagination removed)
     """
     # API endpoint for getting affiliates
     base_url = "https://api.goaffpro.com/v1/admin/affiliates"
@@ -25,66 +25,26 @@ def get_affiliates(max_affiliates=5000):
         "Content-Type": "application/json"
     }
     
-    # All affiliates will be stored here
-    all_affiliates = []
-    
-    # Start with the first page
-    page = 1
-    more_pages = True
-    total_retrieved = 0
-    
     try:
-        # Fetch all pages of affiliates
-        while more_pages and total_retrieved < max_affiliates:
-            print(f"Fetching page {page}...")
-            
-            # Add pagination parameters
-            params = {
-                "page": page,
-                "limit": 100,  # Maximum allowed per page
-                "fields": "id,name,email,ref_code,ref_codes,coupon,coupons,company_name,status,created_at,updated_at"  # Required fields parameter
-            }
-            
-            # Make the API request
-            response = requests.get(base_url, headers=headers, params=params)
-            
-            # Check if the request was successful
-            response.raise_for_status()
-            
-            # Parse the response
-            data = response.json()
-            
-            # Extract affiliate data
-            affiliates_in_page = data.get("affiliates", [])
-            all_affiliates.extend(affiliates_in_page)
-            
-            # Extract pagination information
-            if page == 1:
-                total = data.get("total", 0)
-                total_pages = data.get("total_pages", 1)
-                print(f"Found {total} affiliates across {total_pages} pages")
-                
-                # Set max_affiliates to the actual total if lower than our limit
-                if total and total < max_affiliates:
-                    max_affiliates = total
-                    print(f"Setting maximum affiliates to fetch to {max_affiliates}")
-            
-            total_retrieved += len(affiliates_in_page)
-            print(f"Page {page}: Retrieved {len(affiliates_in_page)} affiliates (Total: {total_retrieved})")
-            
-            # Check if we should continue paginating
-            # Either we have fewer affiliates than the limit, 
-            # or we've reached the total pages reported by the API
-            if len(affiliates_in_page) < params["limit"] or (data.get("total_pages") and page >= data.get("total_pages")):
-                more_pages = False
-            else:
-                page += 1
+        # Make single API request with all needed fields
+        params = {
+            "fields": "id,name,email,ref_code,ref_codes,coupon,coupons,company_name,status,created_at,updated_at"
+        }
         
-        if total_retrieved >= max_affiliates:
-            print(f"\nReached maximum affiliate limit of {max_affiliates}")
+        # Make the API request
+        response = requests.get(base_url, headers=headers, params=params)
         
-        print(f"\nTotal affiliates retrieved: {len(all_affiliates)}")
-        return all_affiliates
+        # Check if the request was successful
+        response.raise_for_status()
+        
+        # Parse the response
+        data = response.json()
+        
+        # Extract affiliate data
+        affiliates = data.get("affiliates", [])
+        print(f"\nRetrieved {len(affiliates)} affiliates")
+        
+        return affiliates
     
     except requests.exceptions.HTTPError as http_err:
         print(f"\nHTTP Error: {http_err}")
@@ -162,28 +122,21 @@ def get_all_affiliates_with_codes(save_to_file=True, max_affiliates=5000):
     
     Args:
         save_to_file: If True, save results to a timestamped JSON file
-        max_affiliates: Maximum number of affiliates to fetch
+        max_affiliates: Maximum number of affiliates to fetch (not used since pagination removed)
     """
     # Get all affiliates (including codes which are already in the response)
-    affiliates = get_affiliates(max_affiliates=max_affiliates)
+    affiliates = get_affiliates()
     
     if not affiliates:
         print("No affiliates found.")
         return []
     
-    # Display summary information only
-    print(f"\nRetrieved {len(affiliates)} affiliates")
-    
     # Count different types of codes
-    ref_code_count = 0
-    coupon_code_count = 0
+    ref_code_count = sum(len(affiliate.get('ref_codes', [])) for affiliate in affiliates)
     
+    # Count coupon codes
+    coupon_code_count = 0
     for affiliate in affiliates:
-        # Count ref codes
-        ref_codes = affiliate.get('ref_codes', [])
-        ref_code_count += len(ref_codes)
-        
-        # Count coupon codes
         main_coupon = affiliate.get('coupon', {})
         all_coupons = affiliate.get('coupons', [])
         
@@ -202,7 +155,15 @@ def get_all_affiliates_with_codes(save_to_file=True, max_affiliates=5000):
         
         try:
             with open(filename, 'w') as f:
-                json.dump({"affiliates": affiliates, "timestamp": timestamp}, f, indent=2)
+                json.dump({
+                    "affiliates": affiliates,
+                    "timestamp": timestamp,
+                    "stats": {
+                        "total_affiliates": len(affiliates),
+                        "total_ref_codes": ref_code_count,
+                        "total_coupon_codes": coupon_code_count
+                    }
+                }, f, indent=2)
             print(f"\nSaved results to {os.path.abspath(filename)}")
         except Exception as e:
             print(f"\nError saving to file: {e}")

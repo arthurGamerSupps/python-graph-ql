@@ -15,7 +15,7 @@ load_dotenv()
 class ShopifyGraphQLClient:
     def __init__(self, use_partner_auth=False):
         # Store domain
-        self.shop_domain = "gamer-supps-development.myshopify.com"  # Update with your shop domain
+        self.shop_domain = "gamersupps.myshopify.com"  # Update with your shop domain
         
         if use_partner_auth:
             # Use OAuth flow for partner app
@@ -95,7 +95,7 @@ def setup_oauth():
     """Set up OAuth for Shopify partner app"""
     client_id = os.getenv('SHOPIFY_CLIENT_ID')
     client_secret = os.getenv('SHOPIFY_CLIENT_SECRET')
-    shop = "gamer-supps-development.myshopify.com"  # Using development store
+    shop = "gamersupps.myshopify.com"  # Using development store
     redirect_uri = "http://localhost:8000/callback"  # You'll need to set up a local server to handle this
     
     if not client_id or not client_secret:
